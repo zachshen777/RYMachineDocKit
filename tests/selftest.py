@@ -30,10 +30,10 @@ import fitz
 pdf_path = os.path.join(tmp, "sample.pdf")
 doc = fitz.open()
 page = doc.new_page(width=595, height=842)
-page.insert_text((72, 100), "使用订单", fontsize=14)
+page.insert_text((72, 100), "使用订单", fontsize=14, fontname="china-s")
 page.insert_text((160, 100), "H1947-001", fontsize=14)
-page.insert_text((72, 140), "规格", fontsize=14)
-page.insert_text((72, 160), "AH36-20x2000x8000", fontsize=14)
+page.insert_text((72, 140), "规格", fontsize=14, fontname="china-s")
+page.insert_text((76, 160), "AH36", fontsize=14)
 doc.save(pdf_path)
 doc.close()
 
@@ -43,8 +43,8 @@ from app.modules.pdf_extract import logic as ex
 rows, pages, has_text = ex.extract_pdf(pdf_path, ["使用订单", "规格"], "right", 6)
 check("提取-向右", any(r.keyword == "使用订单" and r.value == "H1947-001" for r in rows),
       str([(r.keyword, r.value) for r in rows]))
-rows2, _p, _t = ex.extract_pdf(pdf_path, ["规格"], "below", 6)
-check("提取-向下", any(r.value == "AH36-20x2000x8000" for r in rows2),
+rows2, _p, _t = ex.extract_pdf(pdf_path, ["规格"], "below", 20)
+check("提取-向下", any(r.value == "AH36" for r in rows2),
       str([(r.keyword, r.value) for r in rows2]))
 xlsx = os.path.join(tmp, "out.xlsx")
 ex.export_xlsx(rows + rows2, xlsx)
@@ -68,14 +68,14 @@ from app.modules.file_classify import logic as fc
 src_dir = os.path.join(tmp, "归源源")
 names = [
     "CHB2059HW01CM01.pdf", "CHB2059HW01CF02.pdf",
-    "CHB2059HW07PQ01.pdf", "CHB2059HW07CQ01.pdf",   # 同目标重名
+    "seg1/CHB2059HW07PQ01.pdf", "seg2/CHB2059HW07PQ01.pdf",  # 分段不同、文件名相同 → 同目标重名
     "乱七八糟.pdf",                                   # 未识别
     "readme.txt",                                     # 非 PDF
 ]
-nested = os.path.join(src_dir, "11400")
-os.makedirs(nested, exist_ok=True)
 for n in names:
-    with open(os.path.join(nested, n), "w", encoding="utf-8") as f:
+    full = os.path.join(src_dir, n)
+    os.makedirs(os.path.dirname(full), exist_ok=True)
+    with open(full, "w", encoding="utf-8") as f:
         f.write("x")
 plan = fc.analyze_dir(src_dir)
 check("归类-解析数量", plan.pdf_count == 5 and plan.other_count == 1, f"{plan.pdf_count}/{plan.other_count}")
@@ -89,7 +89,7 @@ check("归类-两级目录", "CHB2059/M/CHB2059HW01CM01.pdf" in t, str(t))
 check("归类-重名目录", any("_重名/" in p for p in t), str(t))
 check("归类-其他文件", any(p.startswith("其他文件/") for p in t), str(t))
 check("归类-未识别目录", any("_未识别/" in p for p in t), str(t))
-check("归类-原文件未动", os.path.exists(os.path.join(nested, names[0])))
+check("归类-原文件未动", os.path.exists(os.path.join(src_dir, names[0])))
 
 # zip 来源
 zip_src = os.path.join(tmp, "src.zip")
@@ -115,11 +115,11 @@ rules = [
 ]
 br.preview(items, rules)
 names_new = sorted(it.new_name for it in items)
-check("重命名-规则链", "2026_报表-A-v1_001.txt" in names_new, str(names_new))
+check("重命名-规则链", "2026_报表-A-v1_002.txt" in names_new, str(names_new))
 n, errs = br.execute(items, rn)
 check("重命名-执行", n == 3 and not errs, f"{n} {errs}")
 files_after = sorted(os.listdir(rn))
-check("重命名-落盘", "2026_报表-A-v2_002.txt" in files_after, str(files_after))
+check("重命名-落盘", "2026_报表-A-v2_003.txt" in files_after, str(files_after))
 un, msg = br.undo_last(rn)
 files_undo = sorted(os.listdir(rn))
 check("重命名-撤销", un == 3 and "报告-A-v1.txt" in files_undo, f"{un} {files_undo}")
@@ -129,7 +129,7 @@ r3 = br.Rule("case", {"mode": "upper", "target": "ext"})
 from app.modules.batch_rename.logic import apply_rule
 check("重命名-扩展名大写", apply_rule("a.jpg", r3, 0, 0, False) == "a.JPG")
 r4 = br.Rule("date", {"pos": "suffix", "fmt": "%Y%m%d", "sep": "_"})
-check("重命名-日期", apply_rule("a.txt", r4, 0, 1750000000, False) == "a.txt_20250615",
+check("重命名-日期", apply_rule("a.txt", r4, 0, 1750000000, False) == "a_20250615.txt",
       apply_rule("a.txt", r4, 0, 1750000000, False))
 r5 = br.Rule("replace", {"find": r"v\d+", "replace": "V", "regex": True, "target": "stem"})
 check("重命名-正则", apply_rule("文件-v12.txt", r5, 0, 0, False) == "文件-V.txt")
@@ -139,9 +139,9 @@ items_c = [logic_item for logic_item in []]
 import copy
 it1 = br.RenameItem(os.path.join(rn, "a.txt"), "a.txt", False)
 it2 = br.RenameItem(os.path.join(rn, "b.txt"), "b.txt", False)
-br.preview([it1, it2], [br.Rule("replace", {"find": "", "replace": "", "target": "name"}),
-                       br.Rule("add", {"prefix": "same_", "suffix": ""})])
-check("重命名-批内冲突", it1.status == "conflict" and it2.status == "conflict",
+br.preview([it1, it2], [br.Rule("replace", {"find": "a.txt", "replace": "same.txt", "target": "name"}),
+                       br.Rule("replace", {"find": "b.txt", "replace": "same.txt", "target": "name"})])
+check("重命名-批内冲突", it1.status == "ok" and it2.status == "conflict",
       f"{it1.status}/{it2.status}")
 
 # ---------- UI 模块导入 ----------

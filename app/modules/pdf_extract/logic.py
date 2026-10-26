@@ -50,7 +50,8 @@ def _words_of(page) -> list[tuple[float, float, float, float, str]]:
 def _pick_right(words, krect, tol: float) -> str:
     """同一行（垂直中心差 ≤ tol）关键字右侧最近的连续文字。"""
     ky = (krect.y0 + krect.y1) / 2
-    cand = [w for w in words if w[3] > krect.x1 and abs((w[1] + w[3]) / 2 - ky) <= max(tol, (krect.y1 - krect.y0) / 2)]
+    cand = [w for w in words
+            if w[2] > krect.x1 and abs((w[1] + w[3]) / 2 - ky) <= max(tol, (krect.y1 - krect.y0) / 2)]
     if not cand:
         return ""
     cand.sort(key=lambda w: w[0])

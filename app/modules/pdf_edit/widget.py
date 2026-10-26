@@ -173,7 +173,7 @@ class PdfEditPage(QWidget):
         row.addWidget(self.open_btn)
         row.addWidget(self.file_label, 1)
         row.addWidget(self.page_label)
-        tv.addWidget(row)
+        tv.addLayout(row)
         root.addWidget(top)
 
         body = QHBoxLayout()

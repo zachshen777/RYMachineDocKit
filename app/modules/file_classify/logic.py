@@ -152,8 +152,9 @@ def _build_plan(plan: Plan, entries, rel, mtime):
             continue
         group.sort(key=lambda it: (-it.mtime, it.source))
         for k, it in enumerate(group[1:], 1):
-            stem, ext = os.path.splitext(it.target)
-            it.target = f"{stem}_{k}{ext}"
+            stem, ext = os.path.splitext(os.path.basename(it.target))
+            parent = "/".join(it.target.split("/")[:-1])
+            it.target = f"{parent}/{DUP_DIR}/{stem}_{k}{ext}"
             it.is_dup = True
             plan.dup_count += 1
     plan.items.extend(items)

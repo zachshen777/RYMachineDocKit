@@ -74,28 +74,23 @@ def apply_rule(name: str, rule: Rule, seq: int, mtime: float, is_dir: bool) -> s
         find = p.get("find", "")
         rep = p.get("replace", "")
         use_regex = p.get("regex", False)
+
+        def rep_fn(s):
+            try:
+                return re.sub(find, rep, s) if use_regex else s.replace(find, rep)
+            except re.error:
+                return s
         target = p.get("target", "name")  # name / stem / ext
-        if use_regex:
-            def rx(s):
-                try:
-                    return re.sub(find, rep, s)
-                except re.error:
-                    return s
-            if target == "ext":
-                ext = rx(ext)
-            elif target == "stem":
-                whole_stem = rx(whole_stem)
+        if target == "ext":
+            ext = rep_fn(ext)
+        elif target == "stem":
+            whole_stem = rep_fn(whole_stem)
+        else:  # 整个文件名（含扩展名）上整体替换
+            full = rep_fn(whole_stem + ext if not is_dir else whole_stem)
+            if is_dir:
+                whole_stem = full
             else:
-                whole_stem = rx(whole_stem)
-                ext = rx(ext)
-        else:
-            if target == "ext":
-                ext = ext.replace(find, rep)
-            elif target == "stem":
-                whole_stem = whole_stem.replace(find, rep)
-            else:
-                whole_stem = whole_stem.replace(find, rep)
-                ext = ext.replace(find, rep)
+                whole_stem, ext = _split(full)
     elif t == "add":
         prefix = p.get("prefix", "")
         suffix = p.get("suffix", "")
